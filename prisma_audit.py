@@ -3,11 +3,10 @@ from __future__ import annotations
 import argparse
 import glob
 import json
-import os
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict
 
 import pandas as pd
 import requests
@@ -16,39 +15,9 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ValidationError
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from models import *
 
-Verdict = Literal["present", "absent", "unclear"]
 console = Console()
-
-# ----------------------------
-# Models
-# ----------------------------
-@dataclass
-class Paper:
-    id: str
-    doi: str
-    title: str
-    abstract: str
-    year: Optional[int] = None
-    portal: Optional[str] = None
-    authors: Optional[List[str]] = None
-
-@dataclass
-class ItemResult:
-    item_id: str
-    item_name: str
-    verdict: Verdict
-    confidence: float
-    evidence: List[str]
-    notes: str
-    method: str  # "heuristic" | "llm"
-
-@dataclass
-class PaperReport:
-    paper_id: str
-    title: str
-    doi: str
-    results: List[ItemResult]
 
 # ----------------------------
 # Utilities
@@ -112,61 +81,6 @@ def clip_quotes(snips: List[str], max_len: int = 420) -> List[str]:
             s = s[: max_len - 3] + "..."
         out.append(s)
     return out[:3]
-
-# ----------------------------
-# PRISMA items (subset abstract-level)
-# ----------------------------
-@dataclass(frozen=True)
-class PrismaItem:
-    item_id: str
-    name: str
-    definition: str
-    keywords: List[str]
-
-ITEMS: List[PrismaItem] = [
-    PrismaItem(
-        item_id="1",
-        name="Title identifies the report type",
-        definition="Il titolo dovrebbe identificare il lavoro come systematic review o scoping review.",
-        keywords=["systematic review", "scoping review", "review", "meta-analysis", "metaanalysis"]
-    ),
-    PrismaItem(
-        item_id="4",
-        name="Objectives stated",
-        definition="Dovrebbe esserci una dichiarazione esplicita dell'obiettivo/i o domanda/e della review.",
-        keywords=["objective", "objectives", "aim", "aims", "purpose", "we aimed", "this study aims", "goal"]
-    ),
-    PrismaItem(
-        item_id="6",
-        name="Information sources (databases) mentioned",
-        definition="Dovrebbero essere menzionate fonti informative (es. database: PubMed, Scopus, Web of Science...).",
-        keywords=["pubmed", "medline", "embase", "scopus", "web of science", "cinahl", "cochrane", "ieee xplore", "psycinf"]
-    ),
-    PrismaItem(
-        item_id="24",
-        name="Protocol/registration mentioned",
-        definition="Dovrebbe essere indicato se esiste un protocollo/registrazione (es. PROSPERO) o dove trovarlo.",
-        keywords=["prospero", "registered", "registration", "protocol", "osf", "preregistration", "pre-registered"]
-    ),
-    PrismaItem(
-        item_id="25",
-        name="Funding/support mentioned",
-        definition="Dovrebbero essere riportate fonti di finanziamento/supporto (a livello abstract spesso è assente).",
-        keywords=["funding", "funded", "supported by", "grant", "sponsor", "financial support"]
-    ),
-    PrismaItem(
-        item_id="26",
-        name="Competing interests mentioned",
-        definition="Dovrebbero essere riportati conflitti di interesse/competing interests (nell'abstract spesso è assente).",
-        keywords=["conflict of interest", "conflicts of interest", "competing interests", "no competing interests", "declare no conflict"]
-    ),
-    PrismaItem(
-        item_id="27",
-        name="Data/code availability mentioned",
-        definition="Dovrebbe essere indicata la disponibilità di dati/codice/materiali (spesso in sezioni finali).",
-        keywords=["data availability", "code availability", "github", "repository", "supplementary", "zenodo", "figshare", "osf"]
-    ),
-]
 
 # ----------------------------
 # Heuristic checker
@@ -381,10 +295,10 @@ def save_outputs(reports: List[PaperReport], out_dir: str) -> None:
     df.to_csv(out / "report.csv", index=False, encoding="utf-8")
 
 def build_llm(args) -> Optional[LLMClient]:
-    if args.llm == "none":
+    mode = (args.llm or "").lower() if isinstance(args.llm, str) else args.llm
+    if mode == "none":
         return None
-
-    if args.llm == "ollama":
+    if mode == "ollama":
         return OllamaClient(base_url=args.ollama_url, model=args.model, timeout=args.timeout)
 
     raise ValueError(f"--llm non valido: {args.llm}")
@@ -395,13 +309,13 @@ def main():
     ap = argparse.ArgumentParser(description="PRISMA abstract-level audit (title + abstract from JSON).")
     ap.add_argument("--input", nargs="+", required=True, help="Uno o più pattern glob (es: input/*.json)")
     ap.add_argument("--out", default="output", help="Cartella output")
-    ap.add_argument("--llm", choices=["none", "ollama", "openai"], default="none", help="LLM backend")
+    ap.add_argument("--llm", choices=["none", "ollama", "openai"], default="none", help="LLM backend ('none' per disabilitare)")
     ap.add_argument("--model", default="llama3.1", help="Nome modello (ollama) o modello OpenAI")
     ap.add_argument("--ollama-url", default="http://localhost:11434", help="Base URL Ollama")
     ap.add_argument("--timeout", type=int, default=60, help="Timeout chiamate LLM (secondi)")
     args = ap.parse_args()
 
-    llm =  (args)
+    llm = build_llm(args)
 
     papers = collect_papers(args.input)
     console.print(f"[bold]Trovati {len(papers)} paper[/bold] dai JSON.")
