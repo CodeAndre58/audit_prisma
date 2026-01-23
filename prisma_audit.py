@@ -184,7 +184,7 @@ def heuristic_check(item: PrismaItem, text: str) -> ItemResult:
         ItemResult: Risultato della verifica heuristica con verdict, confidence ed evidence
     
     Descrizione:
-        Esegue una verifica heuristica basata su keyword matching per determinare
+        Esegue una verifica heuristica(ipotesi, stime) basata su keyword matching per determinare
         se un item PRISMA è presente, assente o incerto. Per l'item 1 (Title),
         richiede la keyword nel titolo. Per gli altri item, controlla il testo complessivo.
         Estrae anche snippets di evidenza attorno alle keyword trovate.
