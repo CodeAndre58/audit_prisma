@@ -212,3 +212,5 @@ input/
 # ouput_file
 output/
 output_*/
+
+*.json
