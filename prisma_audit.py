@@ -579,7 +579,7 @@ def main():
     ap.add_argument("--input", nargs="+", required=True, help="Uno o più pattern glob (es: input/*.json)")
     ap.add_argument("--out", default="output", help="Cartella output")
     ap.add_argument("--llm", choices=["none", "ollama", "openai"], default="none", help="LLM backend ('none' per disabilitare)")
-    ap.add_argument("--model", default="llama3.1", help="Nome modello (ollama) o modello OpenAI")
+    ap.add_argument("--model", default="meditron", help="Nome modello (ollama) o modello OpenAI")
     ap.add_argument("--ollama-url", default="http://localhost:11434", help="Base URL Ollama")
     ap.add_argument("--timeout", type=int, default=60, help="Timeout chiamate LLM (secondi)")
     args = ap.parse_args()
